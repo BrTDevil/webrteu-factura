@@ -33,7 +33,9 @@ it('issues through the server and stores its number, id and ANAF status', functi
         && $request->hasHeader('Authorization', 'Bearer tok_secret_123')
         && $request['app_name'] === 'Magazin'
         && $request['invoice']['vat_rate'] === 21
-        && $request['lines'][0]['price'] === 100.0
+        && $request['invoice']['external_id'] === 'CMD-123'
+        && $request['lines'][0]['price'] === 121.0
+        && $request['lines'][0]['price_includes_vat'] === true
         && ! isset($request['invoice']['is_test']));
 });
 
@@ -50,7 +52,7 @@ it('sends the test flag and CAEN from config, without an app name', function ():
 
 it('logs when the server total differs from the order total', function (): void {
     Log::spy();
-    Http::fake([FACTURA.'/invoice' => Http::response(['success' => true, 'invoice_number' => 'INV0006', 'total_gross' => 99.99])]);
+    Http::fake([FACTURA.'/invoice' => Http::response(['success' => true, 'invoice_number' => 'INV0006', 'total_gross' => 99.99, 'total_payable' => 99.99])]);
 
     $invoice = Invoicing::issue(invoiceData(lines: [new InvoiceLineData('Tricou', 5000, 2)]));
 
@@ -98,11 +100,49 @@ it('requires the server URL', function (): void {
     Http::assertNothingSent();
 });
 
-it('does not issue proformas and does not cancel', function (): void {
+it('does not issue proformas', function (): void {
+    expect(fn (): Invoice => Invoicing::issue(invoiceData(InvoiceType::Proforma)))->toThrow(UnsupportedOperationException::class, 'furnizorul local');
+});
+
+it('cancels by stornoing on the server and keeps the storno number', function (): void {
+    Http::fake([
+        FACTURA.'/invoice' => Http::response(fixtureFile('invoice-created.json')),
+        FACTURA.'/invoice/storno' => Http::response(fixtureFile('storno-created.json')),
+    ]);
+
+    $invoice = Invoicing::cancel(Invoicing::issue(invoiceData()));
+
+    expect($invoice->status)->toBe(InvoiceStatus::Cancelled)
+        ->and($invoice->fresh()?->raw['storno'])->toEqual(['invoice_number' => 'INV0006', 'invoice_id' => 43, 'total_payable' => -1210.0, 'anaf_status' => 'Netransmis']);
+    Http::assertSent(fn (Request $request): bool => $request->url() === FACTURA.'/invoice/storno' && $request['invoice_id'] === 42);
+});
+
+it('stornoes by number when the server id is missing, keeping partial answers', function (): void {
+    Http::fake([
+        FACTURA.'/invoice' => Http::response(['success' => true, 'invoice_number' => 'INV0007']),
+        FACTURA.'/invoice/storno' => Http::response(['success' => true]),
+    ]);
+
+    $invoice = Invoicing::cancel(Invoicing::issue(invoiceData()));
+
+    expect($invoice->raw['storno'])->toBe(['invoice_number' => null, 'invoice_id' => null, 'total_payable' => null, 'anaf_status' => null]);
+    Http::assertSent(fn (Request $request): bool => $request->url() === FACTURA.'/invoice/storno' && $request['invoice_number'] === 'INV0007');
+});
+
+it('does not storno through an older server', function (): void {
+    Config::set('factura.legacy_server', true);
     Http::fake([FACTURA.'/invoice' => Http::response(fixtureFile('invoice-created.json'))]);
 
-    expect(fn (): Invoice => Invoicing::issue(invoiceData(InvoiceType::Proforma)))->toThrow(UnsupportedOperationException::class, 'furnizorul local')
-        ->and(fn (): Invoice => Invoicing::cancel(Invoicing::issue(invoiceData())))->toThrow(UnsupportedOperationException::class, 'Stornează');
+    expect(fn (): Invoice => Invoicing::cancel(Invoicing::issue(invoiceData())))->toThrow(UnsupportedOperationException::class, '1.0.5');
+    Http::assertSent(fn (Request $request): bool => $request->url() === FACTURA.'/invoice' && ! isset($request['invoice']['external_id']));
+});
+
+it('logs a repeated order returned by the server', function (): void {
+    Log::spy();
+    Http::fake([FACTURA.'/invoice' => Http::response(['duplicate' => true] + json_decode(fixtureFile('invoice-created.json'), true))]);
+
+    expect(Invoicing::issue(invoiceData())->number)->toBe('INV0005');
+    Log::shouldHaveReceived('info')->once()->with('factura.duplicate', ['reference' => 'CMD-123', 'invoice_number' => 'INV0005']);
 });
 
 it('registers the provider, the config tag and the command', function (): void {

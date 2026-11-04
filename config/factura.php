@@ -37,6 +37,12 @@ return [
         'max_age_days' => 30,
     ],
 
+    /*
+    | true = server de facturare mai vechi de 1.0.5: o singură cotă TVA pe factură, prețuri trimise fără TVA,
+    | fără external_id (idempotență) și fără storno prin API.
+    */
+    'legacy_server' => (bool) env('FACTURA_LEGACY_SERVER', false),
+
     'timeout' => (int) env('FACTURA_TIMEOUT', 30),
 
 ];

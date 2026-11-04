@@ -16,7 +16,7 @@ Adresa serverului e configurabilă: același pachet merge cu orice instalare, nu
 
 - PHP `^8.2`, Laravel 12–13
 - `webrteu/invoicing` ^2.0
-- un server de facturare (factura.webrt.eu v1.0.3+) cu furnizorul configurat și, pentru SPV, conectat la ANAF
+- un server de facturare (factura.webrt.eu **1.0.5+**; pentru 1.0.3–1.0.4 vezi `FACTURA_LEGACY_SERVER`) cu furnizorul configurat și, pentru SPV, conectat la ANAF
 
 ## Instalare
 
@@ -36,6 +36,7 @@ FACTURA_APP_NAME="Magazinul meu"               # ignorat de server când tokenul
 FACTURA_TEST=                                  # true = test, false = real, gol = cum e setat pe server
 FACTURA_CAEN=                                  # opțional, apare în notele facturii
 FACTURA_SYNC_BATCH=2                           # câte statusuri ANAF citește factura:sync la o rulare
+FACTURA_LEGACY_SERVER=false                    # true doar pentru servere mai vechi de 1.0.5
 FACTURA_TIMEOUT=30
 ```
 
@@ -52,6 +53,7 @@ Invoicing::pdf($invoice, 'provider');   // PDF-ul generat de server
 Invoicing::pdf($invoice, 'local');      // PDF-ul din șablonul webrteu/invoicing, cu numărul serverului
 
 Factura::anafStatus($invoice);          // statusul din SPV (serverul îl citește live de la ANAF)
+Invoicing::cancel($invoice);            // stornare pe server (aceeași factură cu minus)
 ```
 
 | Metodă | Server |
@@ -59,6 +61,7 @@ Factura::anafStatus($invoice);          // statusul din SPV (serverul îl citeș
 | `Invoicing::issue()` | `POST /api/v1/invoice` |
 | `Invoicing::pdf($invoice, 'provider')` / `Factura::pdf()` | `GET /api/v1/invoice/pdf?id=` |
 | `Factura::anafStatus($invoice)` | `GET /api/v1/invoice/anaf-status?number=` |
+| `Invoicing::cancel($invoice)` | `POST /api/v1/invoice/storno` |
 
 Statusul ANAF se salvează pe factură (`raw.anaf`), iar la schimbare se emite `AnafStatusChanged($invoice, $from, $to)`.
 Statusurile posibile (`AnafStatus`): `Netransmis`, `Transmis`, `in prelucrare`, `ok` (validată), `nok` (respinsă),
@@ -77,22 +80,34 @@ ultimele 30 de zile, începând cu cele verificate cel mai demult.
 Schedule::command('factura:sync')->everyFiveMinutes()->withoutOverlapping();
 ```
 
-## Limitările serverului (versiunea actuală)
+## Cum se trimite factura (server 1.0.5+)
 
-Pachetul le verifică înainte să trimită, ca să nu ajungă la ANAF o factură pe care o respinge:
+- **Cote TVA pe linie:** fiecare linie își trimite cota (21%, 11%, 0%), iar factura poate avea mai multe cote.
+- **Prețul exact din comandă:** cu TVA inclus sau fără (`price_includes_vat`). Serverul calculează TVA-ul pe cotă,
+  iar totalul de plată (`total_payable`) iese exact cât a plătit clientul. O diferență totuși apărută se loghează
+  ca `factura.total_mismatch`.
+- **Idempotență:** `reference` din `InvoiceData` (numărul comenzii) se trimite ca `external_id`. Dacă cererea se
+  repetă (timeout, job reîncercat), serverul întoarce factura deja creată în loc să facă una nouă
+  (`factura.duplicate` în log). Numărul comenzii apare și în XML, ca referința comenzii (BT-13).
+- **Anulare = stornare:** `Invoicing::cancel($invoice)` cere serverului storno-ul (aceeași factură cu cantități
+  negative, număr nou, trimitere la originală). Factura rămâne `Cancelled`, iar storno-ul se salvează în
+  `raw.storno` (număr, id, total, status ANAF). Storno-ul se transmite la ANAF ca orice factură.
 
-- **O singură cotă de TVA pe factură.** Serverul pune în XML cota de la nivel de factură pe toate liniile. O factură cu
-  21% și 11% e refuzată de pachet cu un mesaj clar: emite facturi separate pe cote.
-- **Emailul clientului e obligatoriu.** Serverul trimite automat PDF-ul pe email. Dacă și site-ul trimite factura,
+### Server mai vechi de 1.0.5
+
+Cu `FACTURA_LEGACY_SERVER=true`, pachetul vorbește în formatul vechi: o singură cotă TVA pe factură (altfel refuză
+cu mesaj clar), prețuri trimise fără TVA (totalul poate ieși cu 1 ban diferit), fără `external_id` și fără storno
+prin API.
+
+## Limitări
+
+- **Emailul clientului e obligatoriu.** Serverul trimite automat PDF-ul pe email; dacă și site-ul trimite factura,
   clientul o primește de două ori.
 - **Doar facturi fiscale.** Proformele se emit cu furnizorul `local`.
-- **Fără anulare prin API.** `Invoicing::cancel()` aruncă `UnsupportedOperationException`: stornezi din interfața serverului.
-- **Prețurile se trimit fără TVA** (cu 4 zecimale), iar serverul recalculează TVA-ul. La prețuri cu TVA inclus, totalul
-  facturii poate ieși cu 1 ban diferit de cel plătit. Diferența se loghează ca `factura.total_mismatch`.
 - **3 cereri pe minut per IP**, pe toate endpoint-urile. La HTTP 429 primești `RateLimitedException` cu `retryAfter`
-  (în secunde). La 429 nu s-a creat nimic, deci poți relua în siguranță, ideal dintr-un job pe coadă.
-- **Fără cheie de idempotență.** Dacă serverul nu răspunde la emitere, primești `InvoiceStateUnknownException`:
-  factura poate exista deja pe server. Verifică înainte să o retrimiți.
+  (secunde). La 429 nu s-a creat nimic, deci poți relua în siguranță, ideal dintr-un job pe coadă.
+- **Fără răspuns la emitere** → `InvoiceStateUnknownException`. Pe server 1.0.5+ cu `reference` completat,
+  retrimiterea e sigură (întoarce factura existentă); altfel verifică în aplicația de facturare înainte.
 
 ## Ce nu face pachetul
 
@@ -105,7 +120,7 @@ Pachetul le verifică înainte să trimită, ca să nu ajungă la ANAF o factur�
 composer test
 ```
 
-Fixture-urile sunt scrise după `docs/api.md` din aplicația de facturare. **De înlocuit cu răspunsuri reale.**
+Fixture-urile sunt scrise după `docs/api.md` și `docs/openapi.yaml` (server 1.0.5). Specificația completă e pe orice server la `/api/openapi.yaml`. **De înlocuit cu răspunsuri reale.**
 
 ## Changelog
 

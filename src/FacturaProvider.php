@@ -24,7 +24,7 @@ use WeBRTeu\Invoicing\Support\Money;
 
 /**
  * Emite facturi prin serverul de facturare (factura.webrt.eu instalat la client), care generează XML-ul UBL / CIUS-RO,
- * PDF-ul și îl transmite în SPV. Numărul facturii vine din seria configurată pe server.
+ * PDF-ul și îl transmite în SPV. Numărul facturii vine din seria configurată pe server. Anularea = stornare.
  */
 class FacturaProvider implements InvoiceProvider, ProvidesPdf
 {
@@ -50,12 +50,18 @@ class FacturaProvider implements InvoiceProvider, ProvidesPdf
             is_string($appName) && $appName !== '' ? $appName : null,
             is_bool($test) ? $test : null,
             is_scalar($caen) && (string) $caen !== '' ? (string) $caen : null,
+            $this->legacy(),
         ));
 
         $number = is_scalar($json['invoice_number'] ?? null) ? (string) $json['invoice_number'] : '';
 
         if ($number === '') {
             throw new FacturaException('Serverul de facturare nu a întors numărul facturii.');
+        }
+
+        if (($json['duplicate'] ?? false) === true) {
+            // Cerere repetată (același external_id): serverul a întors factura deja creată, fără una nouă.
+            Log::info('factura.duplicate', ['reference' => $invoice->reference, 'invoice_number' => $number]);
         }
 
         $this->checkTotal($invoice, $json);
@@ -72,11 +78,25 @@ class FacturaProvider implements InvoiceProvider, ProvidesPdf
     }
 
     /**
-     * Serverul nu are anulare prin API: factura se stornează din aplicația de facturare.
+     * Anularea = stornare (server 1.0.5+): serverul emite aceeași factură cu cantități negative, cu număr nou,
+     * cu trimitere la factura originală. Storno-ul se salvează în raw.storno. Idempotent pe server.
      */
     public function cancel(Invoice $invoice): void
     {
-        throw new UnsupportedOperationException('Serverul de facturare nu permite anularea prin API. Stornează factura din aplicația de facturare.');
+        if ($this->legacy()) {
+            throw new UnsupportedOperationException('Serverul de facturare (versiune veche) nu permite stornarea prin API. Stornează factura din aplicația de facturare sau actualizează serverul la 1.0.5+.');
+        }
+
+        $json = $this->client->send('POST', '/api/v1/invoice/storno', body: $invoice->provider_id !== null && $invoice->provider_id !== ''
+            ? ['invoice_id' => (int) $invoice->provider_id]
+            : ['invoice_number' => (string) $invoice->number]);
+
+        $invoice->forceFill(['raw' => array_merge($invoice->raw ?? [], ['storno' => [
+            'invoice_number' => is_scalar($json['invoice_number'] ?? null) ? (string) $json['invoice_number'] : null,
+            'invoice_id' => is_numeric($json['invoice_id'] ?? null) ? (int) $json['invoice_id'] : null,
+            'total_payable' => is_numeric($json['total_payable'] ?? null) ? (float) $json['total_payable'] : null,
+            'anaf_status' => is_scalar($json['anaf_status'] ?? null) ? (string) $json['anaf_status'] : null,
+        ]])]);
     }
 
     public function pdf(Invoice $invoice): string
@@ -121,14 +141,21 @@ class FacturaProvider implements InvoiceProvider, ProvidesPdf
         return AnafStatus::fromServer(is_array($anaf) && is_string($anaf['status'] ?? null) ? $anaf['status'] : null);
     }
 
+    private function legacy(): bool
+    {
+        return Config::boolean('factura.legacy_server', false);
+    }
+
     /**
-     * Serverul recalculează TVA-ul din prețul fără TVA; o diferență de bani față de comandă se loghează.
+     * Totalul de plată al serverului (total_payable de la 1.0.5, altfel total_gross) trebuie să fie cel al
+     * comenzii; o diferență se loghează. La serverele vechi pot apărea diferențe de 1 ban.
      *
      * @param  array<array-key, mixed>  $json
      */
     private function checkTotal(InvoiceData $invoice, array $json): void
     {
-        $serverTotal = is_numeric($json['total_gross'] ?? null) ? (int) round((float) $json['total_gross'] * 100) : null;
+        $total = $json['total_payable'] ?? $json['total_gross'] ?? null;
+        $serverTotal = is_numeric($total) ? (int) round((float) $total * 100) : null;
 
         if ($serverTotal !== null && $serverTotal !== $invoice->total()) {
             Log::warning('factura.total_mismatch', [

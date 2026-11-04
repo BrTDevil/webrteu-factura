@@ -34,7 +34,7 @@ class FacturaClient
             Log::error('factura.connection_failed', ['path' => $path, 'error' => $exception->getMessage()]);
 
             if ($method === 'POST') {
-                throw new InvoiceStateUnknownException('Serverul de facturare nu a răspuns. Factura poate fi deja creată: verifică în aplicația de facturare înainte să o retrimiți.', 0, $exception);
+                throw new InvoiceStateUnknownException('Serverul de facturare nu a răspuns, deci factura poate fi deja creată. Cu server 1.0.5+ și referința comenzii (external_id), retrimiterea e sigură: întoarce factura existentă. Altfel verifică în aplicația de facturare înainte să o retrimiți.', 0, $exception);
             }
 
             throw new FacturaException('Serverul de facturare nu a răspuns: '.$exception->getMessage(), 0, $exception);
