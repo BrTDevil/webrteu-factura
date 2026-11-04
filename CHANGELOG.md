@@ -6,7 +6,7 @@
 
 ### Adăugat
 - `FacturaProvider` pentru `webrteu/invoicing`: emitere prin `POST /api/v1/invoice`, PDF-ul serverului, status ANAF.
-- URL-ul serverului de facturare și tokenul configurabile (orice instalare factura.webrt.eu).
+- URL-ul serverului de facturare și tokenul configurabile (orice instalare a aplicației de facturare).
 - Cote TVA pe linie, prețuri cu TVA inclus trimise exact, `reference` → `external_id` (idempotență, BT-13 în XML).
 - `Invoicing::cancel()` = stornare pe server (`POST /api/v1/invoice/storno`), salvată în `raw.storno`.
 - Mod `legacy_server` pentru serverele mai vechi de 1.0.5 (o cotă, prețuri nete, fără storno).

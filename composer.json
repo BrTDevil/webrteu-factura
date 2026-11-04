@@ -1,6 +1,6 @@
 {
     "name": "webrteu/factura",
-    "description": "Laravel provider for webrteu/invoicing that issues invoices through a self-hosted factura.webrt.eu e-Factura server (ANAF SPV)",
+    "description": "Laravel provider for webrteu/invoicing that issues invoices through your own self-hosted e-Factura server (e.g. factura.serverul-tau.ro), ANAF SPV",
     "type": "library",
     "license": "MIT",
     "keywords": [

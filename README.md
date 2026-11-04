@@ -5,18 +5,18 @@
 [![Licență MIT](https://img.shields.io/badge/licen%C8%9B%C4%83-MIT-green)](LICENSE.md)
 [![Packagist](https://img.shields.io/packagist/v/webrteu/factura)](https://packagist.org/packages/webrteu/factura)
 
-Furnizor pentru `webrteu/invoicing` care emite facturile prin **serverul de facturare e-Factura** (aplicația
-factura.webrt.eu, instalată pe serverul fiecărui client). Serverul generează XML-ul UBL 2.1 / CIUS-RO și PDF-ul,
+Furnizor pentru `webrteu/invoicing` care emite facturile prin **serverul de facturare e-Factura** (aplicația de
+facturare instalată pe serverul tău sau al clientului, ex. `https://factura.serverul-tau.ro`). Serverul generează XML-ul UBL 2.1 / CIUS-RO și PDF-ul,
 le trimite în SPV ANAF și trimite emailul clientului. Site-ul Laravel nu are nevoie de certificatul digital sau
 de conexiunea OAuth cu ANAF: acestea stau o singură dată pe serverul de facturare.
 
-Adresa serverului e configurabilă: același pachet merge cu orice instalare, nu doar cu factura.webrt.eu.
+Adresa serverului se setează în `FACTURA_URL`: același pachet merge cu orice instalare a aplicației de facturare.
 
 ## Cerințe
 
 - PHP `^8.2`, Laravel 12–13
 - `webrteu/invoicing` ^2.0
-- un server de facturare (factura.webrt.eu **1.0.5+**; pentru 1.0.3–1.0.4 vezi `FACTURA_LEGACY_SERVER`) cu furnizorul configurat și, pentru SPV, conectat la ANAF
+- un server de facturare (aplicația de facturare **1.0.5+**, ex. `https://factura.serverul-tau.ro`; pentru 1.0.3–1.0.4 vezi `FACTURA_LEGACY_SERVER`) cu furnizorul configurat și, pentru SPV, conectat la ANAF
 
 ## Instalare
 
@@ -30,7 +30,7 @@ php artisan vendor:publish --tag=factura-config
 ```dotenv
 INVOICING_PROVIDER=factura
 
-FACTURA_URL=https://efactura.clientul-meu.ro   # adresa serverului de facturare, fără /api/v1
+FACTURA_URL=https://factura.serverul-tau.ro   # adresa serverului de facturare, fără /api/v1
 FACTURA_TOKEN=                                 # server → /api-settings/clients (un token per site, recomandat)
 FACTURA_APP_NAME="Magazinul meu"               # ignorat de server când tokenul e per-magazin
 FACTURA_TEST=                                  # true = test, false = real, gol = cum e setat pe server

@@ -23,7 +23,7 @@ use WeBRTeu\Invoicing\Models\Invoice;
 use WeBRTeu\Invoicing\Support\Money;
 
 /**
- * Emite facturi prin serverul de facturare (factura.webrt.eu instalat la client), care generează XML-ul UBL / CIUS-RO,
+ * Emite facturi prin serverul de facturare (aplicația de facturare instalată pe serverul tău, ex. factura.serverul-tau.ro), care generează XML-ul UBL / CIUS-RO,
  * PDF-ul și îl transmite în SPV. Numărul facturii vine din seria configurată pe server. Anularea = stornare.
  */
 class FacturaProvider implements InvoiceProvider, ProvidesPdf

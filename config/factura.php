@@ -5,7 +5,7 @@ declare(strict_types=1);
 return [
 
     /*
-    | Adresa serverului de facturare (aplicația factura.webrt.eu instalată la client), fără /api/v1.
+    | Adresa serverului de facturare (ex. https://factura.serverul-tau.ro), fără /api/v1.
     */
     'url' => env('FACTURA_URL'),
 
