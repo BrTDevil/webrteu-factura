@@ -1,6 +1,11 @@
 # Changelog
 
-## [Unreleased] (0.1.0)
+## v1.0.0 - 2026-11-04
+
+- Prima versiune stabilă (1.0.0). Fără schimbări de API față de 0.1.x.
+- Descriere și keywords unificate pentru Packagist; homepage corectat.
+
+## v0.1.x
 
 Țintă: serverul de facturare 1.0.5+ (`FACTURA_LEGACY_SERVER=true` pentru servere mai vechi).
 

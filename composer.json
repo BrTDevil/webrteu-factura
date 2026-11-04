@@ -1,16 +1,19 @@
 {
     "name": "webrteu/factura",
-    "description": "Laravel provider for webrteu/invoicing that issues invoices through your own self-hosted e-Factura server (e.g. factura.serverul-tau.ro), ANAF SPV",
+    "description": "e-Factura (ANAF SPV) driver for webrteu/invoicing, via a self-hosted factura server (Laravel, Romania)",
     "type": "library",
     "license": "MIT",
     "keywords": [
         "laravel",
         "romania",
+        "invoicing",
+        "facturare",
+        "e-factura",
         "efactura",
         "anaf",
-        "facturare"
+        "spv"
     ],
-    "homepage": "https://github.com/WeBRTeu/factura",
+    "homepage": "https://github.com/BrTDevil/webrteu-factura",
     "authors": [
         {
             "name": "WeBRTeu",
