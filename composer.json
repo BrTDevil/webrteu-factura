@@ -1,0 +1,95 @@
+{
+    "name": "webrteu/factura",
+    "description": "Laravel provider for webrteu/invoicing that issues invoices through a self-hosted factura.webrt.eu e-Factura server (ANAF SPV)",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "laravel",
+        "romania",
+        "efactura",
+        "anaf",
+        "facturare"
+    ],
+    "homepage": "https://github.com/WeBRTeu/factura",
+    "authors": [
+        {
+            "name": "WeBRTeu",
+            "email": "pfa.razvan.bodnariu@gmail.com",
+            "homepage": "https://webrt.eu"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "illuminate/console": "^12.0|^13.0",
+        "illuminate/http": "^12.0|^13.0",
+        "illuminate/support": "^12.0|^13.0",
+        "webrteu/invoicing": "^2.0"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.13",
+        "laravel/pint": "^1.32",
+        "orchestra/testbench": "^10.0|^11.0",
+        "peckphp/peck": "^0.3",
+        "pestphp/pest": "^3.8|^4.7",
+        "pestphp/pest-plugin-laravel": "^3.2|^4.1",
+        "pestphp/pest-plugin-type-coverage": "^3.6|^4.0.4",
+        "phpstan/phpstan": "^2.3.3,!=2.3.4",
+        "rector/rector": "^2.8"
+    },
+    "autoload": {
+        "psr-4": {
+            "WeBRTeu\\Factura\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "WeBRTeu\\Factura\\Tests\\": "tests/"
+        },
+        "files": [
+            "tests/helpers.php"
+        ]
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "WeBRTeu\\Factura\\FacturaServiceProvider"
+            ],
+            "aliases": {
+                "Factura": "WeBRTeu\\Factura\\Facades\\Factura"
+            }
+        }
+    },
+    "scripts": {
+        "setup": "@composer install",
+        "lint": [
+            "rector",
+            "pint --parallel"
+        ],
+        "test:lint": [
+            "pint --parallel --test",
+            "rector --dry-run"
+        ],
+        "test:spelling": "peck",
+        "test:type-coverage": "pest --type-coverage --min=100",
+        "test:types": "phpstan analyse --memory-limit=1G",
+        "test:arch": "pest tests/Arch",
+        "test:unit": "XDEBUG_MODE=coverage pest --parallel --coverage --exactly=100.0",
+        "test:unit:sequential": "XDEBUG_MODE=coverage pest --coverage --exactly=100.0",
+        "test": [
+            "@test:lint",
+            "@test:spelling",
+            "@test:type-coverage",
+            "@test:types",
+            "@test:arch",
+            "@test:unit"
+        ]
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
